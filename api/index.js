@@ -1,24 +1,27 @@
 export default async function handler(req, res) {
   try {
-    // ✅ GET TEST
+    // ✅ HEALTH CHECK
     if (req.method === "GET") {
       return res.status(200).json({ message: "Zoho Backend Running ✅" });
     }
 
-    // ✅ SAFE BODY HANDLING
-    const body = req.body || {};
-    const name = body.name || "Customer";
-    const phone = body.phone;
-    const issue = body.issue;
-    const email = body.email || "test@example.com";
+    // ✅ FIX: HANDLE ELEVENLABS BODY
+    const data = req.body?.body || req.body || {};
 
+    const name = data.name || "Customer";
+    const phone = data.phone;
+    const issue = data.issue;
+    const email = data.email || "test@example.com";
+
+    // ✅ VALIDATION
     if (!phone || !issue) {
       return res.status(400).json({
-        error: "phone and issue required"
+        error: "phone and issue required",
+        received: data
       });
     }
 
-    // 🔑 TOKEN
+    // 🔑 STEP 1: GET ACCESS TOKEN
     const tokenRes = await fetch("https://accounts.zoho.com/oauth/v2/token", {
       method: "POST",
       headers: {
@@ -36,52 +39,49 @@ export default async function handler(req, res) {
 
     if (!tokenData.access_token) {
       return res.status(500).json({
-        error: "Token failed",
-        response: tokenData
+        error: "Zoho token failed",
+        details: tokenData
       });
     }
 
-    // 🎫 CREATE TICKET
+    const accessToken = tokenData.access_token;
+
+    // 🎫 STEP 2: CREATE TICKET
     const ticketRes = await fetch("https://desk.zoho.com/api/v1/tickets", {
       method: "POST",
       headers: {
         orgId: process.env.ZOHO_ORG_ID,
-        Authorization: `Zoho-oauthtoken ${tokenData.access_token}`,
+        Authorization: `Zoho-oauthtoken ${accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         subject: issue,
         description: issue,
         departmentId: process.env.ZOHO_DEPARTMENT_ID,
-        email: email,
-        phone: phone,
+        email,
+        phone,
         status: "Open",
         priority: "High",
         contact: {
           lastName: name,
-          phone: phone,
-          email: email
+          phone,
+          email
         }
       })
     });
 
     const ticketData = await ticketRes.json();
 
-    if (!ticketData.id) {
-      return res.status(400).json({
-        error: "Zoho failed",
-        response: ticketData
-      });
-    }
-
+    // ✅ RESPONSE
     return res.status(200).json({
       success: true,
-      ticket_id: ticketData.id
+      ticket_id: ticketData.id || null,
+      zoho_response: ticketData
     });
 
   } catch (err) {
     return res.status(500).json({
-      error: "Crash",
+      error: "Server crash",
       message: err.message
     });
   }
