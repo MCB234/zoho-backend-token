@@ -7,6 +7,7 @@ app.use(express.json());
 let accessToken = null;
 let expiry = 0;
 
+// 🔑 Get Zoho Token
 async function getToken() {
   if (accessToken && Date.now() < expiry) return accessToken;
 
@@ -28,6 +29,12 @@ async function getToken() {
   return accessToken;
 }
 
+// 🟢 ROOT ROUTE (IMPORTANT FOR RAILWAY)
+app.get("/", (req, res) => {
+  res.send("Zoho Backend Running ✅");
+});
+
+// 🎫 CREATE TICKET
 app.post("/create-ticket", async (req, res) => {
   try {
     const token = await getToken();
@@ -51,13 +58,20 @@ app.post("/create-ticket", async (req, res) => {
     });
 
     const data = await zoho.json();
-    res.json({ ticket_id: data.id });
+
+    res.json({
+      success: true,
+      ticket_id: data.id,
+      message: "Ticket created successfully"
+    });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Ticket creation failed" });
   }
 });
 
+// 🔍 GET TICKET
 app.get("/get-ticket", async (req, res) => {
   try {
     const token = await getToken();
@@ -70,11 +84,19 @@ app.get("/get-ticket", async (req, res) => {
     });
 
     const data = await zoho.json();
-    res.json({ status: data.status });
+
+    res.json({
+      success: true,
+      status: data.status,
+      subject: data.subject
+    });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch ticket" });
   }
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+// 🚀 START SERVER (FIXED FOR RAILWAY)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on port", PORT));
