@@ -1,16 +1,28 @@
 export default async function handler(req, res) {
   try {
-    // ✅ HANDLE GET
+    // ✅ GET TEST
     if (req.method === "GET") {
       return res.status(200).json({ message: "Zoho Backend Running ✅" });
     }
 
-    // ✅ PARSE BODY (IMPORTANT FIX)
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    // ✅ SAFE BODY PARSE
+    let body = {};
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (e) {
+      return res.status(400).json({ error: "Invalid JSON body" });
+    }
 
     const { name, phone, issue, email } = body;
 
-    // 🔑 GET TOKEN
+    if (!phone || !issue) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        required: ["phone", "issue"]
+      });
+    }
+
+    // 🔑 TOKEN API
     const tokenRes = await fetch("https://accounts.zoho.com/oauth/v2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -27,7 +39,7 @@ export default async function handler(req, res) {
     if (!tokenData.access_token) {
       return res.status(500).json({
         error: "Token failed",
-        details: tokenData
+        zoho_token_response: tokenData
       });
     }
 
@@ -57,11 +69,10 @@ export default async function handler(req, res) {
 
     const data = await zohoRes.json();
 
-    console.log("Zoho Response:", data);
-
+    // 🔥 RETURN FULL RESPONSE FOR DEBUG
     if (!data.id) {
       return res.status(400).json({
-        error: "Zoho error",
+        error: "Zoho ticket failed",
         zoho_response: data
       });
     }
@@ -72,10 +83,9 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("ERROR:", err);
     return res.status(500).json({
-      error: "Internal error",
-      details: err.message
+      error: "Internal crash",
+      message: err.message
     });
   }
 }
