@@ -1,54 +1,45 @@
+export const config = {
+  api: {
+    bodyParser: true
+  }
+};
+
 export default async function handler(req, res) {
   try {
-    // ✅ HEALTH CHECK
+    // ✅ GET
     if (req.method === "GET") {
       return res.status(200).json({ message: "Zoho Backend Running ✅" });
     }
 
-    // 🔥 DEBUG (important)
-    console.log("RAW BODY:", JSON.stringify(req.body));
+    // 🔥 FORCE PARSE BODY
+    let body = {};
 
-    // ✅ HANDLE ALL POSSIBLE INPUT FORMATS
-    const raw = req.body || {};
-    const data = raw.body || raw;
+    if (req.body && Object.keys(req.body).length > 0) {
+      body = req.body;
+    } else {
+      // fallback for raw body
+      let raw = "";
+      for await (const chunk of req) {
+        raw += chunk;
+      }
+      body = raw ? JSON.parse(raw) : {};
+    }
 
-    const name =
-      data.name ||
-      raw.name ||
-      data?.contact_person_name ||
-      "Customer";
+    console.log("PARSED BODY:", body);
 
-    const phone =
-      data.phone ||
-      raw.phone ||
-      data?.phone_number ||
-      "";
+    const name = body.name || "Customer";
+    const phone = body.phone || "";
+    const issue = body.issue || "";
+    const email = body.email || "test@example.com";
 
-    const issue =
-      data.issue ||
-      raw.issue ||
-      data?.user_query ||
-      "";
-
-    const email =
-      data.email ||
-      raw.email ||
-      "test@example.com";
-
-    // ✅ VALIDATION
     if (!phone || !issue) {
       return res.status(400).json({
         error: "phone and issue required",
-        received: {
-          name,
-          phone,
-          issue,
-          email
-        }
+        received: body
       });
     }
 
-    // 🔑 STEP 1: GET ZOHO TOKEN
+    // 🔑 TOKEN
     const tokenRes = await fetch("https://accounts.zoho.com/oauth/v2/token", {
       method: "POST",
       headers: {
@@ -66,19 +57,17 @@ export default async function handler(req, res) {
 
     if (!tokenData.access_token) {
       return res.status(500).json({
-        error: "Zoho token failed",
+        error: "Token failed",
         details: tokenData
       });
     }
 
-    const accessToken = tokenData.access_token;
-
-    // 🎫 STEP 2: CREATE TICKET
+    // 🎫 CREATE TICKET
     const ticketRes = await fetch("https://desk.zoho.com/api/v1/tickets", {
       method: "POST",
       headers: {
         orgId: process.env.ZOHO_ORG_ID,
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
+        Authorization: `Zoho-oauthtoken ${tokenData.access_token}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -99,10 +88,9 @@ export default async function handler(req, res) {
 
     const ticketData = await ticketRes.json();
 
-    // ✅ RESPONSE
     return res.status(200).json({
       success: true,
-      ticket_id: ticketData.id || null,
+      ticket_id: ticketData.id,
       zoho_response: ticketData
     });
 
