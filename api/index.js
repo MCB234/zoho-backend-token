@@ -5,23 +5,50 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: "Zoho Backend Running ✅" });
     }
 
-    // ✅ FIX: HANDLE ELEVENLABS BODY
-    const data = req.body?.body || req.body || {};
+    // 🔥 DEBUG (important)
+    console.log("RAW BODY:", JSON.stringify(req.body));
 
-    const name = data.name || "Customer";
-    const phone = data.phone;
-    const issue = data.issue;
-    const email = data.email || "test@example.com";
+    // ✅ HANDLE ALL POSSIBLE INPUT FORMATS
+    const raw = req.body || {};
+    const data = raw.body || raw;
+
+    const name =
+      data.name ||
+      raw.name ||
+      data?.contact_person_name ||
+      "Customer";
+
+    const phone =
+      data.phone ||
+      raw.phone ||
+      data?.phone_number ||
+      "";
+
+    const issue =
+      data.issue ||
+      raw.issue ||
+      data?.user_query ||
+      "";
+
+    const email =
+      data.email ||
+      raw.email ||
+      "test@example.com";
 
     // ✅ VALIDATION
     if (!phone || !issue) {
       return res.status(400).json({
         error: "phone and issue required",
-        received: data
+        received: {
+          name,
+          phone,
+          issue,
+          email
+        }
       });
     }
 
-    // 🔑 STEP 1: GET ACCESS TOKEN
+    // 🔑 STEP 1: GET ZOHO TOKEN
     const tokenRes = await fetch("https://accounts.zoho.com/oauth/v2/token", {
       method: "POST",
       headers: {
