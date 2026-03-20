@@ -6,18 +6,17 @@ export const config = {
 
 export default async function handler(req, res) {
   try {
-    // ✅ GET
+    // ✅ HEALTH CHECK
     if (req.method === "GET") {
       return res.status(200).json({ message: "Zoho Backend Running ✅" });
     }
 
-    // 🔥 FORCE PARSE BODY
+    // 🔥 PARSE BODY SAFELY
     let body = {};
 
     if (req.body && Object.keys(req.body).length > 0) {
       body = req.body;
     } else {
-      // fallback for raw body
       let raw = "";
       for await (const chunk of req) {
         raw += chunk;
@@ -32,6 +31,7 @@ export default async function handler(req, res) {
     const issue = body.issue || "";
     const email = body.email || "test@example.com";
 
+    // ✅ VALIDATION
     if (!phone || !issue) {
       return res.status(400).json({
         error: "phone and issue required",
@@ -39,8 +39,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🔑 TOKEN
-    const tokenRes = await fetch("https://accounts.zoho.com/oauth/v2/token", {
+    // 🔑 STEP 1: GET TOKEN (FIXED REGION)
+    const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
@@ -62,12 +62,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🎫 CREATE TICKET
+    const accessToken = tokenData.access_token;
+
+    // 🎫 STEP 2: CREATE TICKET
     const ticketRes = await fetch("https://desk.zoho.com/api/v1/tickets", {
       method: "POST",
       headers: {
         orgId: process.env.ZOHO_ORG_ID,
-        Authorization: `Zoho-oauthtoken ${tokenData.access_token}`,
+        Authorization: `Zoho-oauthtoken ${accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -90,7 +92,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      ticket_id: ticketData.id,
+      ticket_id: ticketData.id || null,
       zoho_response: ticketData
     });
 
