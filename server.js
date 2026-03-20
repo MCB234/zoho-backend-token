@@ -54,6 +54,7 @@ app.post("/create-ticket", async (req, res) => {
     res.json({ ticket_id: data.id });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Ticket creation failed" });
   }
 });
@@ -73,8 +74,12 @@ app.get("/get-ticket", async (req, res) => {
     res.json({ status: data.status });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch ticket" });
   }
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+
+// ✅ FIXED PORT (IMPORTANT FOR RAILWAY)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on port", PORT));
